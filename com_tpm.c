@@ -6,21 +6,22 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <errno.h>
+#include "AES_openssl.h"
 
+#define AES_BLOCK_SIZE  16
 
-
-#define AES_GENERATEKEY  301
-#define AES_ENCRYPT  302
-#define AES_DECRYPT  303
-#define RSA_ENCRYPT  304
-#define RSA_DECRYPT  305
+#define AES_GENERATEKEY  171
+#define AES_ENC  172
+#define AES_DEC  173
+#define RSA_ENC  174
+#define RSA_DEC  175
 
 
 int set_opt(int,int,int,char,int);
 int raise_error(int fd,int error);
 int substring(unsigned char* s1,unsigned char* s2,int c,int len);
 
-int excute_crypto(unsigned char* req,unsigned char*rsp)；
+int excute_crypto(unsigned char* req,unsigned char*rsp);
 int excute_AES_Generate_Key(unsigned char* req,unsigned char*rsp);
 int excute_AES_Encrypt(unsigned char* req,unsigned char*rsp);
 int excute_AES_Decrypt(unsigned char* req,unsigned char*rsp);
@@ -52,19 +53,21 @@ void main()
 			
 			while((nByte = read(fd, buffer, 1024))>0 || len < buf[5]){
 				flag =1;
-				printf("in\n");				
+				//printf("in\n");				
 				for(i = len; i < (len + nByte); i++){
 					buf[i] = buffer[i - len];
 				}
 					len += nByte;
-				if (t++>1000){
+			/*	if (t++>100000){
+					unsigned char ercode[]={0.179,0,0,0,10,0,0,0,1};				
 					flag = 0;
 					t = 0;
-					len = 0;
-					raise_error(fd,1);
+					len = 0;		
+ 					write(fd,ercode,10);
 					memset(buffer, 0, sizeof(buffer));
 					memset(buf,0,sizeof(buf));
-				}					
+					break;
+				}*/					
 			}
 			
 			if(flag == 1){
@@ -74,13 +77,12 @@ void main()
                 			printf("%02x ", buf[i]);
        				printf("\n");
                 
-				if (buf[9]<300){
+				if (buf[9]<=170 || buf[9]>=180 ){
 					fdd = open("/dev/tpm0",O_RDWR);
-                	if(fdd < 0){
-                    	printf("Error: Open() failed: (%02x )\n ", fd);
+                		if(fdd < 0){
+                    		printf("Error: Open() failed: (%02x )\n ", fd);
 					}
 					printf("Opened\n");
-					/*写入tpm并取得结果*/
 					res = write(fdd, buf, len);
 					printf("%d write to tpm.\n",res);
 					buf_size = 1024;
@@ -90,9 +92,10 @@ void main()
 					
 				}
 				else{
-					res = excute_crypto(buf,buffer);
+					memset(buffer,0,sizeof(buffer));					
+					ret = excute_crypto(buf,buffer);
 				}
-				/*写回到软件栈*/
+				/*write back to TSS*/
 				write(fd,buffer,ret);
                 
 				memset(buffer, 0, sizeof(buffer));
@@ -104,16 +107,20 @@ void main()
 	}
 }
 
-int raise_error(int fd,int error){
-	unsigned char buf[128];
-	switch(error):
-	case 1:
-		buf = {0,300,0,0,0,10,0,0,0,1};
-		write(fd,buf,ret);
-		break;
-	default:
-		break;
-}
+// int raise_error(int fd,int error){
+// 	unsigned char buf[128];
+	
+// 	switch(error){
+// 		case 1:
+// 			buf = {0,179,0,0,0,10,0,0,0,1};
+// 			write(fd,buf,10);
+// 			break;
+// 		default:
+// 			printf("Error.");
+// 			break;
+// 	}
+	
+// }
 
 
 int substring(unsigned char* s1,unsigned char* s2,int c,int len){
@@ -125,23 +132,27 @@ int substring(unsigned char* s1,unsigned char* s2,int c,int len){
     return 0;
 }
 
-{0,193,0,0,0,13,0,0,0,301,}
 
 
 int excute_crypto(unsigned char* req,unsigned char*rsp){
 	int cmd;
+	int ret;
 	cmd = req[9];
 	printf("%d\n",cmd );
 	switch(cmd){
 		case AES_GENERATEKEY:
-		excute_AES_Generate_Key(req,rsp);
+printf("in\n");
+		ret = excute_AES_Generate_Key(req,rsp);
+		return ret;
 		break;
 		
 	case AES_ENC:
-	 	excute_AES_Encrypt(req,rsp);
-	 	break;
+	 	ret = excute_AES_Encrypt(req,rsp);
+		return ret;	 	
+		break;
 	case AES_DEC:
-	 	excute_AES_Decrypt(req,rsp);
+	 	ret = excute_AES_Decrypt(req,rsp);
+		return ret;
 	 	break;
 	// case RSA_encrypt:
 	// 	pass;
@@ -167,7 +178,13 @@ int excute_AES_Generate_Key(unsigned char* req,unsigned char*rsp){
 
 	for(i=10,j=0;j<len;i++,j++)
         *(rsp + i) = key[j];
-    return 0;
+	
+	for(i = 0; i < len+10; i++)
+	printf("%02x ", rsp[i]);
+	printf("\n");
+                
+
+    return len+10;
 }
 
 int excute_AES_Encrypt(unsigned char* req,unsigned char*rsp){
@@ -178,6 +195,7 @@ int excute_AES_Encrypt(unsigned char* req,unsigned char*rsp){
 	unsigned char iv_enc[128];
 	unsigned char data[128];
 	unsigned char out[128];
+	
 
 	memset(out,0,sizeof(out));
 	memset(key,0,sizeof(key));
@@ -201,8 +219,14 @@ int excute_AES_Encrypt(unsigned char* req,unsigned char*rsp){
 	rsp[9]=encslength;
 
 	for(i=10,j=0;j<encslength;i++,j++)
+
         *(rsp + i) = out[j];
-    return 0;
+	for(i = 0; i < encslength+10; i++)
+		printf("%02x ", rsp[i]);
+	printf("\n");
+
+
+    return encslength+10;
 }
 
 
@@ -239,7 +263,11 @@ int excute_AES_Decrypt(unsigned char* req,unsigned char*rsp){
 	for(i=10,j=0;j<dec_length;i++,j++)
         *(rsp + i) = out[j];
 
-	return 0;
+	for(i = 0; i < dec_length+10; i++)
+		printf("%02x ", rsp[i]);
+	printf("\n");
+
+	return dec_length + 10 ;
 }
 
 
