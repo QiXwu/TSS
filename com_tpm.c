@@ -7,6 +7,7 @@
 #include <termios.h>
 #include <errno.h>
 #include "AES_openssl.h"
+#include "RSA_openssl.h"
 
 #define AES_BLOCK_SIZE  16
 
@@ -15,6 +16,8 @@
 #define AES_DEC  173
 #define RSA_ENC  174
 #define RSA_DEC  175
+#define RSA_GET  176
+
 
 
 int set_opt(int,int,int,char,int);
@@ -154,10 +157,18 @@ printf("in\n");
 	 	ret = excute_AES_Decrypt(req,rsp);
 		return ret;
 	 	break;
-	// case RSA_encrypt:
-	// 	pass;
-	// case RSA_decrypt:
-	// 	pass;
+	case RSA_GET:
+	 	ret = excute_RSA_GetpubKey(req,rsp);
+		return ret;
+	 	break;
+	case RSA_ENC:
+		ret = excute_RSA_encrypt(req,rsp);
+		return ret;
+	 	break;
+	case RSA_DEC:
+		ret = excute_RSA_decrypt(req,rsp);
+		return ret;
+	 	break;
 	default:
 		printf("Command Error. \n");
 		break;
@@ -270,6 +281,57 @@ int excute_AES_Decrypt(unsigned char* req,unsigned char*rsp){
 	return dec_length + 10 ;
 }
 
+int excute_RSA_GetpubKey(unsigned char* req,unsigned char*rsp){
+	int len;
+	unsigned char* key;
+	len = RSA_GetpubKey(key);
+	rsp[5]=len + 10;
+	rsp[9]=len;
+	
+	for(i=10,j=0;j<len;i++,j++)
+        *(rsp + i) = key[j];
+	
+	return len+10;
+}
+
+int excute_RSA_encrypt(unsigned char* req,unsigned char*rsp){
+	int len,i;
+	int datalength;
+	unsigned char* data;
+	unsigned char* enc_data;
+
+	datalength = req[10];
+	for (i=0;i<datalength;i++)
+		data[i]=req[11+i];
+	
+	enc_data=RSA_encrypt(data,"test_pub.key");
+	
+	len = strlen(enc_data);
+	rsp[9] = len;
+	rsp[5] = len + 10;
+	
+	return len + 10;
+}
+
+
+int excute_RSA_decrypt(unsigned char* req,unsigned char*rsp){
+	int len,i;
+	int datalength;
+	unsigned char* data;
+	unsigned char* dec_data;
+
+	datalength = req[10];
+	for (i=0;i<datalength;i++)
+		data[i]=req[11+i];
+	
+	dec_data=RSA_decrypt(data,"test.key");
+	
+	len = strlen(dec_data);
+	rsp[9] = len;
+	rsp[5] = len + 10;
+	
+	return len + 10;
+}
 
 
 
