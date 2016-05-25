@@ -17,6 +17,7 @@
 #define RSA_ENC  174
 #define RSA_DEC  175
 #define RSA_GET  176
+#define PCR  179
 
 
 
@@ -80,7 +81,7 @@ void main()
                 			printf("%02x ", buf[i]);
        				printf("\n");
                 
-				if (buf[9]<=170 || buf[9]>=180 ){
+				if (buf[9]<=170 || buf[9]>=180){
 					fdd = open("/dev/tpm0",O_RDWR);
                 		if(fdd < 0){
                     		printf("Error: Open() failed: (%02x )\n ", fd);
@@ -144,7 +145,6 @@ int excute_crypto(unsigned char* req,unsigned char*rsp){
 	printf("%d\n",cmd );
 	switch(cmd){
 		case AES_GENERATEKEY:
-printf("in\n");
 		ret = excute_AES_Generate_Key(req,rsp);
 		return ret;
 		break;
@@ -281,58 +281,78 @@ int excute_AES_Decrypt(unsigned char* req,unsigned char*rsp){
 	return dec_length + 10 ;
 }
 
+
 int excute_RSA_GetpubKey(unsigned char* req,unsigned char*rsp){
-	int len;
-	unsigned char* key;
+	int len,i,j;
+	unsigned char key[1024];
 	len = RSA_GetpubKey(key);
-	rsp[5]=len + 10;
-	rsp[9]=len;
+	printf("%d\n",len );
 	
+	memset(rsp,0,sizeof(rsp));
+
 	for(i=10,j=0;j<len;i++,j++)
         *(rsp + i) = key[j];
 	
+    for (i=0;i<len+10;i++)
+        printf("%02x ", rsp[i]);
+    printf("\n");
+
 	return len+10;
 }
 
 int excute_RSA_encrypt(unsigned char* req,unsigned char*rsp){
-	int len,i;
+	int len,i,j;
 	int datalength;
-	unsigned char* data;
-	unsigned char* enc_data;
+	unsigned char data[1024];
+	unsigned char enc_data[1024];
 
 	datalength = req[10];
 	for (i=0;i<datalength;i++)
 		data[i]=req[11+i];
 	
-	enc_data=RSA_encrypt(data,"test_pub.key");
+	len=RSA_encrypt(data,"test_pub.key",enc_data);
+
+
+	printf("%d\n",len);
+
+
+	for(i=10,j=0;j<len;i++,j++)
+        *(rsp + i) = enc_data[j];
 	
-	len = strlen(enc_data);
+
 	rsp[9] = len;
 	rsp[5] = len + 10;
-	
+
+
+	for (i=0;i<=len+10;i++)
+        printf("%02x ", rsp[i]);
+    printf("\n");
+
 	return len + 10;
 }
 
 
 int excute_RSA_decrypt(unsigned char* req,unsigned char*rsp){
-	int len,i;
+	int len,i,j;
 	int datalength;
-	unsigned char* data;
-	unsigned char* dec_data;
+	unsigned char data[1024];
+	unsigned char dec_data[1024];
 
 	datalength = req[10];
 	for (i=0;i<datalength;i++)
 		data[i]=req[11+i];
 	
-	dec_data=RSA_decrypt(data,"test.key");
+	len=RSA_decrypt(data,"test.key",dec_data);
+
+	for(i=10,j=0;j<len;i++,j++)
+        *(rsp + i) = dec_data[j];
 	
-	len = strlen(dec_data);
+
 	rsp[9] = len;
 	rsp[5] = len + 10;
 	
 	return len + 10;
 }
-
 
 
 int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)

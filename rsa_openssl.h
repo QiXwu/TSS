@@ -16,7 +16,7 @@
 
 
 
-char* RSA_encrypt(char *str,char *path_key);
-char* RSA_decrypt(char *str,char *path_key);
+int RSA_encrypt(char *str,char *path_key,unsigned char *p_en);
+int RSA_decrypt(char *str,char *path_key,unsigned char *p_de);
 
 #endif
